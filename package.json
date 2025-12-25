@@ -2,6 +2,11 @@
     "name": "applift-hook-maker",
     "displayName": "applift-hook-maker",
     "description": "A simple extension to help you create hooks that can be used inside your codebase",
+    "publisher": "notTheRightGuy",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/NotTheRightGuy/applift-hook-maker"
+    },
     "version": "0.0.1",
     "engines": {
         "vscode": "^1.107.0"
