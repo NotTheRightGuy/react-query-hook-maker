@@ -1,13 +1,13 @@
 {
-    "name": "applift-hook-maker",
-    "displayName": "applift-hook-maker",
+    "name": "react-query-hook-builder",
+    "displayName": "React Query Hook Builder",
     "description": "A simple extension to help you create hooks that can be used inside your codebase",
     "publisher": "notTheRightGuy",
     "repository": {
         "type": "git",
-        "url": "https://github.com/NotTheRightGuy/applift-hook-maker"
+        "url": "https://github.com/NotTheRightGuy/react-query-hook-maker"
     },
-    "version": "0.0.2",
+    "version": "0.0.3",
     "engines": {
         "vscode": "^1.107.0"
     },
@@ -20,7 +20,11 @@
         "commands": [
             {
                 "command": "extension.generateHook",
-                "title": "Applift: Generate API Hook"
+                "title": "React Query Hook Builder: Generate Hook from specs"
+            },
+            {
+                "command": "extension.generateHookFromOpenAPI",
+                "title": "React Query Hook Builder: Generate Hook from OpenAPI Spec"
             }
         ]
     },

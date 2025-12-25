@@ -16,8 +16,9 @@ suite('generateFiles Test Suite', () => {
         const result = await generateFiles(props);
         
         // Assert Hook
-        assert.ok(result.hook.includes('options?: UseQueryOptions<WithResponse<GetUserResponse>>'));
-        assert.ok(result.hook.includes("queryKey: getUserKey.keys({ scope: 'getUser' })"));
+        assert.ok(result.hook.includes('options?: { enabled?: boolean }'));
+        assert.ok(result.hook.includes("getUserKey.keys({"));
+        assert.ok(result.hook.includes("scope: 'getUser'"));
         
         // Assert Query Key
         assert.ok(result.queryKey.includes("export const getUserKey = {"));

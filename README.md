@@ -1,4 +1,4 @@
-# Applift Hook Maker
+# React Query Hook Builder 
 
 A VS Code extension that accelerates React Query development by automatically generating TypeScript types, API functions, query keys, and React hooks from API endpoint specifications.
 
@@ -99,14 +99,14 @@ This extension does not contribute any VS Code settings. All configuration is do
 
 ## Known Issues
 
-- The extension assumes specific naming patterns and helper functions (`WithResponse`, `showSnackbarOnApiError`, etc.) used in the Applift codebase
+- The extension assumes specific naming patterns and helper functions (`WithResponse`, `showSnackbarOnApiError`, etc.) used in the React Query Hook Builder codebase
 - Generated code may need minor adjustments for projects with different architectural patterns
 
 ## Release Notes
 
 ### 0.0.1
 
-Initial release of Applift Hook Maker featuring:
+Initial release of React Query Hook Builder featuring:
 - Interactive API hook generation
 - Automatic TypeScript type generation from JSON
 - Support for useQuery, useMutation, and useInfiniteQuery

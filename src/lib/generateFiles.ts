@@ -1,4 +1,4 @@
-import { generateTypesFromJson } from "./generateType";
+import { generateTypesFromJson, generateTypesFromSchema } from "./generateType";
 
 interface GenerateFilesProps {
     featureName: string;
@@ -7,6 +7,8 @@ interface GenerateFilesProps {
     exampleResponse: string;
     params: string;
     hookType: string;
+    responseSchema?: string;
+    paramsSchema?: string;
 }
 
 export interface GenerateFileResponse {
@@ -26,6 +28,8 @@ export async function generateFiles(
         exampleResponse,
         params,
         hookType,
+        responseSchema,
+        paramsSchema,
     } = props;
 
     const pascalName =
@@ -60,7 +64,20 @@ export async function generateFiles(
     let responseModel = `export type ${pascalName}Response = any;`;
     let apiReturnType = `${pascalName}Response`; // Default fallback
 
-    if (exampleResponse && exampleResponse.trim()) {
+    if (responseSchema) {
+        try {
+            const typeName = `${pascalName}Response`;
+            responseModel = await generateTypesFromSchema(
+                responseSchema,
+                typeName
+            );
+            apiReturnType = typeName;
+        } catch (e) {
+             throw new Error(
+                `Failed to generate response types from schema: ${(e as Error).message}`
+            );
+        }
+    } else if (exampleResponse && exampleResponse.trim()) {
         try {
             const parsed = await parseJson(exampleResponse);
 
@@ -129,6 +146,7 @@ export async function generateFiles(
     const urlVars = Array.from(processedApiUrl.matchAll(/\${(\w+)}/g)).map((m) => m[1]);
 
     let paramsJson: Record<string, any> = {};
+
     if (params && params.trim()) {
         try {
             paramsJson = await parseJson(params);
@@ -147,7 +165,14 @@ export async function generateFiles(
 
     let variablesInterfaceName = `${pascalName}Variables`;
     let variablesDefinition = "";
-    if (Object.keys(paramsJson).length > 0) {
+    
+    if (paramsSchema) {
+         variablesDefinition = await generateTypesFromSchema(
+            paramsSchema,
+            variablesInterfaceName
+        );
+        variablesType = variablesInterfaceName;
+    } else if (Object.keys(paramsJson).length > 0) {
         variablesDefinition = await generateTypesFromJson(
             paramsJson,
             variablesInterfaceName
@@ -176,14 +201,50 @@ export async function generateFiles(
         apiArgsTyped = `: { ${urlVars.map((v) => `${v}: any`).join("; ")} }`;
     }
 
-    const bodyParams = Object.keys(paramsJson).filter(
-        (k) => !urlVars.includes(k)
-    );
+    // If we have paramsSchema, we can't easily filter bodyParams vs urlVars without parsing schema
+    // For now, we assume if paramsSchema is present, bodyParams are all keys in the schema minus urlVars?
+    // Actually, for generateFiles, bodyParams is a string array of Keys used for destructuring or building the axios call.
+    // If we only have schema, we don't know the exact keys easily without parsing the generated TS or the schema JSON.
+    // But we CAN parse the schema JSON here since it's passed as string.
+    
+    let bodyParams: string[] = [];
+
+    if (paramsSchema) {
+        try {
+            const parsedSchema = JSON.parse(paramsSchema);
+            // Assuming simple object schema properties
+             if (parsedSchema.properties) {
+                bodyParams = Object.keys(parsedSchema.properties).filter(
+                    (k) => !urlVars.includes(k)
+                );
+             }
+        } catch (e) {
+            // ignore
+        }
+    } else {
+        bodyParams = Object.keys(paramsJson).filter(
+            (k) => !urlVars.includes(k)
+        );
+    }
 
     let apiFunction = "";
 
     if (hookType === "useQuery" || hookType === "useInfiniteQuery") {
-        const allVars = [...new Set([...urlVars, ...Object.keys(paramsJson)])];
+        let allVars: string[] = [];
+        if (paramsSchema) {
+             // If schema, we need keys. We tried to parse above.
+             // Rethinking: We should parse paramsSchema to get keys if possible.
+             try {
+                const parsed = JSON.parse(paramsSchema);
+                if (parsed.properties) {
+                     allVars = [...new Set([...urlVars, ...Object.keys(parsed.properties)])];
+                } else {
+                     allVars = urlVars;
+                }
+             } catch(e) { allVars = urlVars; }
+        } else {
+             allVars = [...new Set([...urlVars, ...Object.keys(paramsJson)])];
+        }
 
         const destructureLine =
             allVars.length > 0
@@ -291,24 +352,37 @@ ${hookType === "useInfiniteQuery" ? "  const { pageParam } = context;" : ""}
     let queryKeyDefinition = "";
 
     // New logic for Query Key Definition to support object arguments with type safety
-    const hasVariables = Object.keys(paramsJson).length > 0;
-    
-    // Construct Query Key Args Type
-    let queryKeyArgsType = `{ scope: '${camelName}' }`;
-    
-    if (hasVariables) {
-        queryKeyArgsType += ` & ${variablesInterfaceName}`;
-    }
+    const hasVariables = paramsSchema ? true : Object.keys(paramsJson).length > 0;
 
-    queryKeyDefinition = `export const ${queryKeyName} = {
-  keys: (args: ${queryKeyArgsType}) => [args] as const,
-};`;
+    if (hookType !== 'useMutation') {
+        
+        // Construct Query Key Args Type
+        let queryKeyArgsType = `{ scope: '${camelName}' }`;
+        
+        if (hasVariables) {
+            queryKeyArgsType += ` & ${variablesInterfaceName}`;
+        }
+    
+        queryKeyDefinition = `export const ${queryKeyName} = {
+      keys: (args: ${queryKeyArgsType}) => [args] as const,
+    };`;
+    }
 
     const hookName = `use${pascalName}`;
     let hookBody = "";
 
     if (hookType === "useQuery") {
-        const allVars = [...new Set([...urlVars, ...Object.keys(paramsJson)])];
+        let allVars: string[] = [];
+        if (paramsSchema) {
+             try {
+                const parsed = JSON.parse(paramsSchema);
+                 if (parsed.properties) {
+                     allVars = [...new Set([...urlVars, ...Object.keys(parsed.properties)])];
+                } else { allVars = urlVars; }
+             } catch(e) { allVars = urlVars; }
+        } else {
+             allVars = [...new Set([...urlVars, ...Object.keys(paramsJson)])];
+        }
         const extraHookOptions = `options?: { enabled?: boolean }`;
         
         // Destructure arguments for the hook
@@ -349,7 +423,17 @@ ${hookType === "useInfiniteQuery" ? "  const { pageParam } = context;" : ""}
 };`;
 
     } else if (hookType === "useInfiniteQuery") {
-         const allVars = [...new Set([...urlVars, ...Object.keys(paramsJson)])];
+         let allVars: string[] = [];
+         if (paramsSchema) {
+              try {
+                const parsed = JSON.parse(paramsSchema);
+                 if (parsed.properties) {
+                     allVars = [...new Set([...urlVars, ...Object.keys(parsed.properties)])];
+                } else { allVars = urlVars; }
+             } catch(e) { allVars = urlVars; }
+         } else {
+             allVars = [...new Set([...urlVars, ...Object.keys(paramsJson)])];
+         }
          const extraHookOptions = `options?: { enabled?: boolean }`;
          
          let hookPropsType = "";
@@ -403,10 +487,8 @@ ${hookType === "useInfiniteQuery" ? "  const { pageParam } = context;" : ""}
  };`;
  
      } else if (hookType === "useMutation") {
-         let keysCall = `${queryKeyName}.keys({ scope: '${camelName}' })`;
-         if (variablesType !== "void" && variablesType !== "any") {
-            keysCall = `${queryKeyName}.keys({ scope: '${camelName}', ...variables })`;
-         }
+         // mutationKey logic removed
+
 
         hookBody = `export const ${hookName} = (options?: {
   onSuccess?: (
@@ -418,7 +500,6 @@ ${hookType === "useInfiniteQuery" ? "  const { pageParam } = context;" : ""}
 }) => {
   const invalidateQueries = useInvalidateCommonQueries();
   return useMutation({
-    mutationKey: ${keysCall},
     mutationFn: ${apiFunctionName},
     onSuccess: (...args) => {
       invalidateQueries();

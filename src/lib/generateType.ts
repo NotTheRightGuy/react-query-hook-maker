@@ -2,6 +2,8 @@ import {
     quicktype,
     InputData,
     jsonInputForTargetLanguage,
+    JSONSchemaInput,
+    FetchingJSONSchemaStore,
 } from "quicktype-core";
 
 export async function generateTypesFromJson(
@@ -18,6 +20,31 @@ export async function generateTypesFromJson(
 
     const inputData = new InputData();
     inputData.addInput(jsonInput);
+
+    const result = await quicktype({
+        inputData,
+        lang: "typescript",
+        rendererOptions: {
+            "just-types": "true",
+        },
+    });
+
+    return result.lines.join("\n");
+}
+
+export async function generateTypesFromSchema(
+    schema: string,
+    rootTypeName = "Root"
+) {
+    const schemaInput = new JSONSchemaInput(new FetchingJSONSchemaStore());
+
+    await schemaInput.addSource({
+        name: rootTypeName,
+        schema: schema,
+    });
+
+    const inputData = new InputData();
+    inputData.addInput(schemaInput);
 
     const result = await quicktype({
         inputData,
