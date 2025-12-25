@@ -38,7 +38,8 @@ function isAlreadyImported(content: string, symbol: string): boolean {
 export async function getImportsForContent(
     content: string,
     targetFilePath: string,
-    existingContent: string = ''
+    existingContent: string = '',
+    knownLocations: Record<string, string> = {}
 ): Promise<string[]> {
     const importsToAdd: string[] = [];
     
@@ -109,6 +110,19 @@ export async function getImportsForContent(
              if (symbolAbsPath !== targetFilePath) {
                  const importPath = getRelativeImportPath(targetFilePath, symbolAbsPath);
                  importsToAdd.push(`import { ${sym} } from '${importPath}';`);
+             }
+        }
+    }
+
+    // 3. Dynamic Symbols (from content) + Known Locations
+    for (const [sym, loc] of Object.entries(knownLocations)) {
+        if (matchesSymbol(content, sym) && !isAlreadyImported(existingContent, sym)) {
+             if (loc !== targetFilePath) {
+                 const importPath = getRelativeImportPath(targetFilePath, loc);
+                 const importStmt = `import { ${sym} } from '${importPath}';`;
+                 if (!importsToAdd.includes(importStmt)) {
+                    importsToAdd.push(importStmt);
+                 }
              }
         }
     }
