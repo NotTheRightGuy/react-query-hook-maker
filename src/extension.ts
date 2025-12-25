@@ -75,7 +75,9 @@ export function activate(context: vscode.ExtensionContext) {
                     label: string,
                     stateKey: string
                 ) => {
-                    if (!content || !content.trim()) return;
+                    if (!content || !content.trim()) {
+                        return;
+                    }
 
                     let targetPath: string | undefined;
                     const lastPath =
